@@ -8,7 +8,7 @@
 
    ```bash
    git clone https://github.com/giaNguy3n/sui-play.git
-   cd sui-play
+   cd red-green-light-game
 
 2. **Install dependencies**
 
