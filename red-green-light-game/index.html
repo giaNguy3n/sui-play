@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Red Light Green Light</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      background: #cce5ff;
+    }
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    #resetButton {
+      display: none;
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Green Light</div>
+  <button id="resetButton">Reset Game</button>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('status');
+    const resetButton = document.getElementById('resetButton');
+
+    const playerImage = new Image();
+    playerImage.src = '/mnt/data/91c299d5-be93-4bb2-8ecc-dac2a8eb9764.png';
+
+    const player = {
+      x: 100,
+      y: 500,
+      width: 40,
+      height: 60,
+      speed: 3
+    };
+
+    let keys = {};
+    let gameState = 'green';
+    let lastSwitchTime = 0;
+    let caughtMoving = false;
+    let victory = false;
+
+    function switchState() {
+      gameState = gameState === 'green' ? 'red' : 'green';
+      statusText.textContent = gameState.charAt(0).toUpperCase() + gameState.slice(1) + ' Light';
+      statusText.style.color = gameState === 'green' ? 'green' : 'red';
+      lastSwitchTime = Date.now();
+    }
+
+    function drawPlayer() {
+      ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+    }
+
+    function drawFinishLine() {
+      ctx.fillStyle = 'yellow';
+      ctx.fillRect(0, 0, canvas.width, 10);
+    }
+
+    function update() {
+      if (Date.now() - lastSwitchTime > 2000) {
+        switchState();
+      }
+
+      let moved = false;
+
+      if (keys['ArrowUp']) { player.y -= player.speed; moved = true; }
+      if (keys['ArrowDown']) { player.y += player.speed; moved = true; }
+      if (keys['ArrowLeft']) { player.x -= player.speed; moved = true; }
+      if (keys['ArrowRight']) { player.x += player.speed; moved = true; }
+
+      if (gameState === 'red' && moved) {
+        caughtMoving = true;
+        resetButton.style.display = 'block';
+      }
+
+      if (player.y <= 0) {
+        victory = true;
+        resetButton.style.display = 'block';
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawFinishLine();
+      drawPlayer();
+
+      if (caughtMoving) {
+        ctx.fillStyle = 'black';
+        ctx.font = '40px Arial';
+        ctx.fillText('You were caught moving!', 200, 300);
+      }
+
+      if (victory) {
+        ctx.fillStyle = 'green';
+        ctx.font = '40px Arial';
+        ctx.fillText('You Win!', 300, 300);
+      }
+    }
+
+    function gameLoop() {
+      if (!caughtMoving && !victory) {
+        update();
+      }
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function resetGame() {
+      player.x = 100;
+      player.y = 500;
+      caughtMoving = false;
+      victory = false;
+      lastSwitchTime = Date.now();
+      gameState = 'green';
+      statusText.textContent = 'Green Light';
+      statusText.style.color = 'green';
+      resetButton.style.display = 'none';
+    }
+
+    resetButton.addEventListener('click', resetGame);
+    window.addEventListener('keydown', (e) => keys[e.key] = true);
+    window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+    switchState();
+    gameLoop();
+  </script>
+</body>
+</html>
