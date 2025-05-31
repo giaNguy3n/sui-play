@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
+import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { Transaction } from '@mysten/sui/transactions';
 
 export default function App() {
   const account = useCurrentAccount();
+  const signAndExecute = useSignAndExecuteTransaction();
 
   const canvasRef = useRef(null);
-  const resetBtnRef = useRef(null);
   const [gameState, setGameState] = useState('green');
   const [caughtMoving, setCaughtMoving] = useState(false);
   const [victory, setVictory] = useState(false);
   const [statusText, setStatusText] = useState('Green Light');
   const [statusColor, setStatusColor] = useState('green');
+  const [gameStarted, setGameStarted] = useState(false);
 
   const player = useRef({ x: 100, y: 500, width: 40, height: 60, speed: 3 });
   const keys = useRef({});
@@ -33,8 +35,8 @@ export default function App() {
       setGameState(newState);
       setStatusText(`${newState.charAt(0).toUpperCase() + newState.slice(1)} Light`);
       setStatusColor(newState === 'green' ? 'green' : 'red');
-      lastSwitchTime.current = Date.now();
-      nextSwitchDelay.current = 1000 + Math.random() * 4000; // Random 1 to 5 seconds
+      lastSwitchTime.current = performance.now();
+      nextSwitchDelay.current = 1000 + Math.random() * 4000;
     }
 
     function drawPlayer() {
@@ -48,9 +50,9 @@ export default function App() {
     }
 
     function update() {
-      if (Date.now() - lastSwitchTime.current > nextSwitchDelay.current) {
+      if (performance.now() - lastSwitchTime.current > nextSwitchDelay.current) {
         switchState();
-      } 
+      }
 
       let moved = false;
 
@@ -61,12 +63,10 @@ export default function App() {
 
       if (gameState === 'red' && moved) {
         setCaughtMoving(true);
-        resetBtnRef.current.style.display = 'block';
       }
 
       if (player.current.y <= 0) {
         setVictory(true);
-        resetBtnRef.current.style.display = 'block';
       }
     }
 
@@ -96,26 +96,39 @@ export default function App() {
       animationRef.current = requestAnimationFrame(gameLoop);
     }
 
-    gameLoop();
+    if (gameStarted) {
+      lastSwitchTime.current = performance.now();
+      nextSwitchDelay.current = 1000 + Math.random() * 4000;
+      animationRef.current = requestAnimationFrame(gameLoop);
+    }
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       cancelAnimationFrame(animationRef.current);
     };
-  }, [gameState, caughtMoving, victory]);
+  }, [gameState, caughtMoving, victory, gameStarted]);
 
-  const resetGame = () => {
-    player.current.x = 100;
-    player.current.y = 500;
-    setCaughtMoving(false);
-    setVictory(false);
-    setGameState('green');
-    setStatusText('Green Light');
-    setStatusColor('green');
-    lastSwitchTime.current = Date.now();
-    nextSwitchDelay.current = 2000 + Math.random() * 4000;
-    resetBtnRef.current.style.display = 'none';
+  const handleStartOrReset = async () => {
+    if (!account) return alert('Please connect your wallet first');
+
+    try {
+      const tx = new Transaction();
+      tx.setSender(account.address);
+      tx.setGasBudget(1000000000);
+      await signAndExecute.mutateAsync({ transaction: tx });
+
+      player.current.x = 100;
+      player.current.y = 500;
+      setCaughtMoving(false);
+      setVictory(false);
+      setGameState('green');
+      setStatusText('Green Light');
+      setStatusColor('green');
+      setGameStarted(true);
+    } catch (err) {
+      console.error('Transaction failed:', err);
+    }
   };
 
   return (
@@ -140,25 +153,25 @@ export default function App() {
       >
         {statusText}
       </div>
-      <button
-        ref={resetBtnRef}
-        style={{
-          display: 'none',
-          position: 'absolute',
-          top: 50,
-          left: 10,
-          padding: '10px 20px',
-          fontSize: 16,
-          backgroundColor: '#007bff',
-          color: 'white',
-          border: 'none',
-          borderRadius: 5,
-          cursor: 'pointer'
-        }}
-        onClick={resetGame}
-      >
-        Reset Game
-      </button>
+      {(caughtMoving || victory || !gameStarted) && (
+        <button
+          style={{
+            position: 'absolute',
+            top: 50,
+            left: 10,
+            padding: '10px 20px',
+            fontSize: 16,
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: 5,
+            cursor: 'pointer'
+          }}
+          onClick={handleStartOrReset}
+        >
+          {gameStarted ? 'Play Again (Sign TX)' : 'Start Game (Sign TX)'}
+        </button>
+      )}
       <canvas
         ref={canvasRef}
         width={800}
