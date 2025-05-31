@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
+import SHA256 from 'crypto-js/sha256';
 
 export default function App() {
   const account = useCurrentAccount();
@@ -19,12 +20,17 @@ export default function App() {
   const lastSwitchTime = useRef(0);
   const nextSwitchDelay = useRef(0);
   const animationRef = useRef(null);
+  const moveHistory = useRef([]);
+  const hasMovedOnRed = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     const handleKeyDown = (e) => (keys.current[e.key] = true);
+
     const handleKeyUp = (e) => (keys.current[e.key] = false);
 
     window.addEventListener('keydown', handleKeyDown);
@@ -63,10 +69,12 @@ export default function App() {
 
       if (gameState === 'red' && moved) {
         setCaughtMoving(true);
+        submitGame();
       }
 
       if (player.current.y <= 0) {
         setVictory(true);
+        submitGame();
       }
     }
 
@@ -92,7 +100,9 @@ export default function App() {
       if (!caughtMoving && !victory) {
         update();
       }
+
       draw();
+
       animationRef.current = requestAnimationFrame(gameLoop);
     }
 
@@ -109,37 +119,56 @@ export default function App() {
     };
   }, [gameState, caughtMoving, victory, gameStarted]);
 
-  const handleStartOrReset = async () => {
-    if (!account) return alert('Please connect your wallet first');
+  const submitGame = async () => {
+    const moves = moveHistory.current;
+    const movesHash = SHA256(JSON.stringify(moves)).toString();
+
+    const tx = new Transaction();
+    tx.moveCall({
+      target: '0x19d75625474b9a15a0104497498e541734e1419907311d1276b119ea17f90357::game::submit_game',
+      arguments: [
+        tx.pure(Boolean(victory), 'bool'),
+        tx.pure(String(movesHash), 'string')
+      ]
+    });
 
     try {
-      const tx = new Transaction();
-      tx.setSender(account.address);
-      tx.setGasBudget(1000000000);
-      await signAndExecute.mutateAsync({ transaction: tx });
+      const result = await signAndExecute.mutateAsync({ transaction: tx });
+      console.log('Game submitted to blockchain', result);
+    } catch (e) {
+      console.error('Submit failed:', e);
+    }
+  };
 
-      player.current.x = 100;
-      player.current.y = 500;
-      setCaughtMoving(false);
-      setVictory(false);
-      setGameState('green');
-      setStatusText('Green Light');
-      setStatusColor('green');
-      setGameStarted(true);
-    } catch (err) {
-      console.error('Transaction failed:', err);
+  const startOrResetGame = async () => {
+    if (!account) return alert('Connect your wallet');
+
+    try {
+        const tx = new Transaction();
+        tx.setSender(account.address);
+        tx.setGasBudget(100000000);
+        await signAndExecute.mutateAsync({ transaction: tx });
+
+        player.current.x = 100;
+        player.current.y = 500;
+        setCaughtMoving(false);
+        setVictory(false);
+        setGameState('green');
+        setStatusText('Green Light');
+        setStatusColor('green');
+        setGameStarted(true);
+        moveHistory.current = [];
+        keys.current = {};
+    } catch (e) {
+        console.error('Game start failed:', e);
     }
   };
 
   return (
     <div>
-      <div style={{ position: 'absolute', top: 10, right: 10 }}>
+      <div style={{ position: 'absolute', top: 10, right: 10, textAlign: 'center' }}>
         <ConnectButton />
-        {account ? (
-          <p>Connected: {account.address}</p>
-        ) : (
-          <p>Not connected</p>
-        )}
+        {account ? <p>Wallet Connected!</p> : <p>Not Connected</p>}
       </div>
       <div
         style={{
@@ -153,7 +182,7 @@ export default function App() {
       >
         {statusText}
       </div>
-      {(caughtMoving || victory || !gameStarted) && (
+      {(!gameStarted || caughtMoving || victory) && (
         <button
           style={{
             position: 'absolute',
@@ -167,17 +196,12 @@ export default function App() {
             borderRadius: 5,
             cursor: 'pointer'
           }}
-          onClick={handleStartOrReset}
+          onClick={startOrResetGame}
         >
           {gameStarted ? 'Play Again (Sign TX)' : 'Start Game (Sign TX)'}
         </button>
       )}
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={600}
-        style={{ display: 'block', background: '#cce5ff' }}
-      />
+      <canvas ref={canvasRef} width={800} height={600} style={{ display: 'block', background: '#cce5ff' }} />
     </div>
   );
 }
