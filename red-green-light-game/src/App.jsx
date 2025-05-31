@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
 
 export default function App() {
+  const account = useCurrentAccount();
+
   const canvasRef = useRef(null);
   const resetBtnRef = useRef(null);
   const [gameState, setGameState] = useState('green');
@@ -117,6 +120,14 @@ export default function App() {
 
   return (
     <div>
+      <div style={{ position: 'absolute', top: 10, right: 10 }}>
+        <ConnectButton />
+        {account ? (
+          <p>Connected: {account.address}</p>
+        ) : (
+          <p>Not connected</p>
+        )}
+      </div>
       <div
         style={{
           position: 'absolute',
