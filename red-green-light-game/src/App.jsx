@@ -3,12 +3,15 @@ import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '
 import { Transaction } from '@mysten/sui/transactions';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import SHA256 from 'crypto-js/sha256';
+import './app.css';
+import playerImage from './assets/player.png';
 
-const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+
 
 export default function App() {
   const account = useCurrentAccount();
   const signAndExecute = useSignAndExecuteTransaction();
+  const client = new SuiClient({ url: getFullnodeUrl('testnet') });
 
   const canvasRef = useRef(null);
   const [gameState, setGameState] = useState('green');
@@ -25,13 +28,18 @@ export default function App() {
   const nextSwitchDelay = useRef(0);
   const animationRef = useRef(null);
   const moveHistory = useRef([]);
-  const hasMovedOnRed = useRef(false);
+  const playerImageRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const img = new Image();
+    img.src = playerImage;
+    img.onload = () => {
+      playerImageRef.current = img;
+    };
 
     const handleKeyDown = (e) => (keys.current[e.key] = true);
 
@@ -50,8 +58,19 @@ export default function App() {
     }
 
     function drawPlayer() {
-      ctx.fillStyle = 'red';
-      ctx.fillRect(player.current.x, player.current.y, player.current.width, player.current.height);
+      if (playerImageRef.current) {
+        ctx.drawImage(
+          playerImageRef.current,
+          player.current.x,
+          player.current.y,
+          player.current.width,
+          player.current.height
+        );
+      } else {
+        // fallback: draw red square if image not ready yet
+        ctx.fillStyle = 'red';
+        ctx.fillRect(player.current.x, player.current.y, player.current.width, player.current.height);
+      }
     }
 
     function drawFinishLine() {
@@ -154,16 +173,20 @@ export default function App() {
         options: { showType: true, showContent: true },
       });
 
-      const gameResultObject = gameObjects.data.find(obj =>
-        obj.data?.type?.includes('::game::GameResult')
+      const gameResultObjects = gameObjects.data.filter(
+        obj => obj.data?.type?.includes('::game::GameResult')
       );
 
-      if (gameResultObject) {
-        const objectId = gameResultObject.data.objectId;
+      gameResultObjects.sort((a, b) =>
+        b.data.objectId.localeCompare(a.data.objectId)
+      );
 
+      const latestGameResult = gameResultObjects[0];
+
+      if (latestGameResult) {
         const fullObject = await client.getObject({
-          id: objectId,
-          options: { showContent: true }
+          id: latestGameResult.data.objectId,
+          options: { showContent: true },
         });
 
         setGameResult(fullObject.data?.content?.fields);
@@ -201,50 +224,33 @@ export default function App() {
 
   return (
     <div>
-      <div style={{ position: 'absolute', top: 10, right: 10, textAlign: 'center' }}>
+      <div className="wallet-status">
         <ConnectButton />
         {account ? <p>Wallet Connected!</p> : <p>Not Connected</p>}
       </div>
-      <div
-        style={{
-          position: 'absolute',
-          top: 10,
-          left: 10,
-          fontSize: 24,
-          fontWeight: 'bold',
-          color: statusColor
-        }}
-      >
-        {statusText}
-      </div>
+      <div className="status-text" style={{ color: statusColor }}>{statusText}</div>
       {(!gameStarted || caughtMoving || victory) && (
-        <button
-          style={{
-            position: 'absolute',
-            top: 50,
-            left: 10,
-            padding: '10px 20px',
-            fontSize: 16,
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: 5,
-            cursor: 'pointer'
-          }}
-          onClick={startOrResetGame}
-        >
-          {gameStarted ? 'Play Again (Sign TX)' : 'Start Game (Sign TX)'}
+        <button className="game-button" onClick={startOrResetGame}>
+          {gameStarted ? 'Play Again' : 'Start Game'}
         </button>
       )}
+      <canvas ref={canvasRef} width={800} height={600} style={{ display: 'block', background: '#cce5ff' }} />
       {gameResult && (
-        <div style={{ position: 'absolute', top: 100, left: 10 }}>
-          <p><strong>Game On-Chain Result:</strong></p>
-          <p>Player: {gameResult.player}</p>
-          <p>Victory: {gameResult.won.toString()}</p>
-          <p>Hash: {gameResult.moves_hash}</p>
+        <div className="game-result">
+          <h3>Game On-Chain Result:</h3>
+          <p className="player-address"><strong>Player:</strong> {gameResult.player}</p>
+          <p>
+            <strong>Victory:</strong>{' '}
+            <span className={victory ? 'victory-true' : 'victory-false'}>
+              {victory ? 'Yes' : 'No'}
+            </span>
+          </p>
+          <div>
+            <strong>Moves Hash:</strong>
+            <div className="hash-box">{gameResult.moves_hash}</div>
+          </div>
         </div>
       )}
-      <canvas ref={canvasRef} width={800} height={600} style={{ display: 'block', background: '#cce5ff' }} />
     </div>
   );
 }

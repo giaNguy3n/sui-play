@@ -40,3 +40,75 @@
 .read-the-docs {
   color: #888;
 }
+
+.status-text {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.wallet-status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  text-align: center;
+}
+
+.game-button {
+  position: absolute;
+  top: 50px;
+  left: 10px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.game-result {
+  position: absolute;
+  top: 100px;
+  left: 10px;
+  max-width: 600px;
+  background-color: #fff;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  opacity: 0.7;
+}
+
+.game-result h3 {
+  margin-top: 0;
+  color: #007bff;
+}
+
+.game-result .player-address {
+  color: #333;
+}
+
+.game-result .victory-true {
+  color: green;
+}
+
+.game-result .victory-false {
+  color: red;
+}
+
+.game-result .hash-box {
+  background-color: #f4f4f4;
+  padding: 4px 6px;
+  border-radius: 4px;
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  overflow-wrap: break-word;
+}
+
