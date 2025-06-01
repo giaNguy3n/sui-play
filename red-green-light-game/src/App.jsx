@@ -3,7 +3,7 @@ import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '
 import { Transaction } from '@mysten/sui/transactions';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import SHA256 from 'crypto-js/sha256';
-import './app.css';
+import './App.css';
 import playerImage from './assets/player.png';
 
 
