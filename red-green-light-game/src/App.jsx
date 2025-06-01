@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import SHA256 from 'crypto-js/sha256';
+
+const client = new SuiClient({ url: getFullnodeUrl('testnet') });
 
 export default function App() {
   const account = useCurrentAccount();
@@ -14,6 +17,7 @@ export default function App() {
   const [statusText, setStatusText] = useState('Green Light');
   const [statusColor, setStatusColor] = useState('green');
   const [gameStarted, setGameStarted] = useState(false);
+  const [gameResult, setGameResult] = useState(null);
 
   const player = useRef({ x: 100, y: 500, width: 40, height: 60, speed: 3 });
   const keys = useRef({});
@@ -78,12 +82,12 @@ export default function App() {
 
       if (gameState === 'red' && moved) {
         setCaughtMoving(true);
-        submitGame();
+        submitGame(false);
       }
 
       if (player.current.y <= 0) {
         setVictory(true);
-        submitGame();
+        submitGame(true);
       }
     }
 
@@ -128,9 +132,7 @@ export default function App() {
     };
   }, [gameState, caughtMoving, victory, gameStarted]);
 
-  const submitGame = async () => {
-    if (!account) return alert('Please connect your wallet');
-    
+  const submitGame = async (didWin) => {
     const moves = moveHistory.current;
     const movesHash = SHA256(JSON.stringify(moves)).toString();
 
@@ -139,14 +141,34 @@ export default function App() {
     tx.moveCall({
       target: '0x19d75625474b9a15a0104497498e541734e1419907311d1276b119ea17f90357::game::submit_game',
       arguments: [
-        tx.pure.bool(victory),
+        tx.pure.address(account.address),
+        tx.pure.bool(didWin),
         tx.pure.string(movesHash)
       ]
     });
 
     try {
-      const result = await signAndExecute.mutateAsync({ transaction: tx });
-      console.log('Game submitted to blockchain', result);
+      // const result = await signAndExecute.mutateAsync({ transaction: tx });
+      const gameObjects = await client.getOwnedObjects({
+        owner: account.address,
+        options: { showType: true, showContent: true },
+      });
+
+      const gameResultObject = gameObjects.data.find(obj =>
+        obj.data?.type?.includes('::game::GameResult')
+      );
+
+      if (gameResultObject) {
+        const objectId = gameResultObject.data.objectId;
+
+        const fullObject = await client.getObject({
+          id: objectId,
+          options: { showContent: true }
+        });
+
+        setGameResult(fullObject.data?.content?.fields);
+      }
+
     } catch (e) {
       console.error('Submit failed:', e);
     }
@@ -171,6 +193,7 @@ export default function App() {
         setGameStarted(true);
         moveHistory.current = [];
         keys.current = {};
+        setGameResult(null);
     } catch (e) {
         console.error('Game start failed:', e);
     }
@@ -212,6 +235,14 @@ export default function App() {
         >
           {gameStarted ? 'Play Again (Sign TX)' : 'Start Game (Sign TX)'}
         </button>
+      )}
+      {gameResult && (
+        <div style={{ position: 'absolute', top: 100, left: 10 }}>
+          <p><strong>Game On-Chain Result:</strong></p>
+          <p>Player: {gameResult.player}</p>
+          <p>Victory: {gameResult.won.toString()}</p>
+          <p>Hash: {gameResult.moves_hash}</p>
+        </div>
       )}
       <canvas ref={canvasRef} width={800} height={600} style={{ display: 'block', background: '#cce5ff' }} />
     </div>
