@@ -67,6 +67,15 @@ export default function App() {
       if (keys.current['ArrowLeft']) { player.current.x -= player.current.speed; moved = true; }
       if (keys.current['ArrowRight']) { player.current.x += player.current.speed; moved = true; }
 
+      if (moved) {
+        moveHistory.current.push({
+          x: player.current.x,
+          y: player.current.y,
+          timestamp: Date.now(),
+          duringRed: gameState === 'red'
+        });
+      }
+
       if (gameState === 'red' && moved) {
         setCaughtMoving(true);
         submitGame();
@@ -120,15 +129,18 @@ export default function App() {
   }, [gameState, caughtMoving, victory, gameStarted]);
 
   const submitGame = async () => {
+    if (!account) return alert('Please connect your wallet');
+    
     const moves = moveHistory.current;
     const movesHash = SHA256(JSON.stringify(moves)).toString();
 
     const tx = new Transaction();
+
     tx.moveCall({
       target: '0x19d75625474b9a15a0104497498e541734e1419907311d1276b119ea17f90357::game::submit_game',
       arguments: [
-        tx.pure(Boolean(victory), 'bool'),
-        tx.pure(String(movesHash), 'string')
+        tx.pure.bool(victory),
+        tx.pure.string(movesHash)
       ]
     });
 
